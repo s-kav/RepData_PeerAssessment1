@@ -60,3 +60,4 @@ for (i in 1:nrow(TOT_mean_imp)) {
 }
 
 ggplot(data = TOT_mean_imp, aes(x = date, y = MEAN), mar = c(4, 4, 2, 2)) + geom_line(stat = "identity", aes(x = date, y = MEAN, color = sign)) + geom_point() + facet_wrap(.~sign, ncol = 2, scales = "free") + xlab("Days") + ylab("Average number of steps") + theme(strip.background = element_rect(colour = "black", fill =  "white", size = 1, linetype = "solid"), legend.position = "top") + geom_smooth(span = 1) + geom_rug()
+
