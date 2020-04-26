@@ -1,0 +1,62 @@
+library(dplyr)
+install.packages("mice")
+library(mice)
+library(ggplot2)
+
+path <- getwd()
+if (!file.exists("Activity.zip")) {
+Url <- "https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2Factivity.zip"
+
+download.file(Url, destfile = paste0(path, "/Activity.zip"), method = "curl")
+
+if (!file.exists("Activity.csv")) {unzip(zipfile = paste0(path, "Activity.zip"), exdir = ".")}
+}
+
+## After downloading the data we proceed to read it into R.
+
+AC <- read.csv("./activity.csv", header = TRUE, sep = ",", na.strings = "NA", stringsAsFactors = FALSE, colClasses = c("integer", "Date", "integer"))
+
+summary(AC)
+
+paste0("Total number of missing values in the dataset = ", length(as.numeric(which(is.na(AC)))), ", this is ", round(mean(is.na(AC))*100, 3), " % from common volume")
+
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 2))
+hist(AC$steps, xlim = c(0, 100), breaks = 50, main = "Total number of steps taken by days", xlab = "Steps", col = "chocolate", border = "black")
+hist(AC$steps, xlim = c(100, max(AC$steps, na.rm = TRUE)), ylim = c(0, 200), breaks = 50, main = "Total number of steps taken by days", xlab = "Steps", col = "chocolate", border = "black")
+
+paste0("Mean of steps per day for all dataset = ", round(mean(AC$steps, na.rm = TRUE), 3))
+paste0("Median of steps per day for all dataset = ", round(median(AC$steps, na.rm = TRUE), 3))
+
+TOT_mean <- AC %>% group_by(date) %>% summarise(MEAN = mean(steps, na.rm = TRUE))
+inp_data <- mice(TOT_mean, m = 5, method = "pmm", maxit = 40, seed = 500)
+TOT_mean_imp <- complete(inp_data, 5)
+
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 2))
+plot(TOT_mean, type = "l", lty = 1, lwd = 3, main = "Aver. number of steps", xlab = "Days", ylab = "Average value across all days")
+plot(TOT_mean_imp, type = "l", lty = 1, lwd = 3, main = "Aver. number of steps w/imputation", xlab = "Days")
+
+TOT_max <- AC %>% group_by(date) %>% summarise(MAX = max(steps, na.rm = TRUE))
+TOT_max$MAX <- replace(TOT_max$MAX, as.numeric(which(TOT_max$MAX == "-Inf")), NaN)
+inp_data <- mice(TOT_max, m = 5, method = "pmm", maxit = 40, seed = 500)
+TOT_max_imp <- complete(inp_data, 5)
+
+par(mfrow = c(1, 2), mar = c(4, 4, 2, 2))
+plot(TOT_max, type = "l", lty = 1, lwd = 3, main = "Max number of steps", xlab = "Days", ylab = "Average value across all days")
+plot(TOT_max_imp, type = "l", lty = 1, lwd = 3, main = "Max number of steps w/imputation", xlab = "Days")
+
+paste0("Mean of of the total daily number of steps = ", round(mean(TOT_mean$MEAN, na.rm = TRUE), 3))
+paste0("Median of of the total daily number of steps = ", round(median(TOT_mean$MEAN, na.rm = TRUE), 3))
+
+a1 <- mean(TOT_mean$MEAN, na.rm = TRUE)
+a2 <- mean(TOT_mean_imp$MEAN)
+if (a1 > a2) {paste0("Imputing missing data is decrased a mean of the total daily number of steps on ", round((abs(a1 - a2)/max(a1, a2) * 100), 3), " %")} else {paste0("Imputing missing data is incrased a mean of the total daily number of steps on ", round((abs(a1 - a2)/max(a1, a2) * 100), 3), " %")}
+
+a3 <- mean(TOT_max$MAX, na.rm = TRUE)
+a4 <- mean(TOT_max_imp$MAX)
+if (a1 > a2) {paste0("Imputing missing data is decrased a max of the total daily number of steps on ", round((abs(a3 - a4)/max(a3, a4) * 100), 3), " %")} else {paste0("Imputing missing data is incrased a max of the total daily number of steps on ", round((abs(a3 - a4)/max(a3, a4) * 100), 3), " %")}
+
+for (i in 1:nrow(TOT_mean_imp)) {
+        ifelse(weekdays(TOT_mean_imp$date[i]) == "Saturday" | weekdays(TOT_mean_imp$date[i]) == "Sunday", TOT_mean_imp$sign[i] <- "weekend", TOT_mean_imp$sign[i] <- "weekday")
+}
+
+ggplot(data = TOT_mean_imp, aes(x = date, y = MEAN), mar = c(4, 4, 2, 2)) + geom_line(stat = "identity", aes(x = date, y = MEAN, color = sign)) + geom_point() + facet_wrap(.~sign, ncol = 2, scales = "free") + xlab("Days") + ylab("Average number of steps") + theme(strip.background = element_rect(colour = "black", fill =  "white", size = 1, linetype = "solid"), legend.position = "top") + geom_smooth(span = 1) + geom_rug()
